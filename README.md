@@ -134,11 +134,3 @@ Agent:  Done. Transaction created successfully.
 The Skill File
 skill.md is the single file that gives the agent everything it needs to work
 with the Product API. It is written in the OpenClaw skill format and contains:
-
-Section	What It Provides
-Inputs / Outputs	Typed parameter definitions the agent maps user intent onto
-Steps	Ordered, unambiguous instructions for building and sending each request
-Implementation	A ready-to-run JavaScript reference the agent can execute
-Example Invocation	A concrete JSON example the agent can pattern-match against
-You do not need to write any custom tool code. Loading skill.md is sufficient
-for a compatible agent to start using the Product API.
