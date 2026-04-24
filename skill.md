@@ -3,7 +3,6 @@
 ## Metadata
 - **skill_id**: jsonrpc-rsa-signed-api-integration
 - **version**: 2.0.0
-- **author**: agent-system
 - **tags**: [jsonrpc, api, rsa, signature, authentication, http, security]
 
 ---
