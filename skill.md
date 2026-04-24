@@ -109,14 +109,14 @@ Encode as Base64 using Buffer.from(...).toString('base64')
 Prepend "Basic " → Authorization header
 
 ### Step 5 — Assemble Headers
-
+```
 {
   "Content-Type": "application/json",
   "x-api-key": "<api_key>",
   "x-api-signature": "<base64-rsa-signature>",
   "Authorization": "Basic <base64-credentials>"
 }
-
+```
 ### Step 6 — Send HTTP POST Request
 Method: POST (always, per JSON-RPC over HTTP spec)
 URL: endpoint_url
@@ -131,7 +131,7 @@ If result → return as success payload
 ### Step 8 — Return Structured Output
 
 Pseudocode
-
+```bash
 FUNCTION call_jsonrpc(endpoint, method, params, requestId, privateKeyHex, apiKey, authUser, authPass):
 
   // Step 1: Build JSON-RPC body
@@ -169,9 +169,9 @@ FUNCTION call_jsonrpc(endpoint, method, params, requestId, privateKeyHex, apiKey
   json = JSON.parse(response.body)
 
   return parsed response
-
+```
 JavaScript Implementation Reference
-
+```
 const { KJUR, RSAKey, hextob64 } = require('jsrsasign');
 
 /**
@@ -242,7 +242,7 @@ async function callJsonRpc({
 
   return json;
 }
-
+```
 ⚠️ Critical security guidelines for agents handling this skill:
 
 Never log privateKeyHex or basicAuthPass in plain text
@@ -251,7 +251,7 @@ The signature is bound to the exact raw body string — never reuse across reque
 
 
 Example Agent Invocation
-
+```
 {
   "skill_id": "jsonrpc-rsa-signed-api-integration",
   "inputs": {
@@ -270,4 +270,4 @@ Example Agent Invocation
     "basic_auth_pass": "auth_pass"
   }
 }
-
+```
