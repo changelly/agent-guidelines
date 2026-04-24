@@ -73,11 +73,13 @@ Before running an agent against the Product API you will need:
 1 — Configure Credentials
 Store all secrets as environment variables. Never hardcode them.
 
+```bash
 PRODUCT_ENDPOINT_URL=https://api.changelly.com/v2/
 PRODUCT_PRIVATE_KEY_HEX=308204bc020100300d06092a864886...
 PRODUCT_API_KEY=EKikACbkQiYNConmbByoWqQW1=
 PRODUCT_BASIC_AUTH_USER=ba_username
 PRODUCT_BASIC_AUTH_PASS=ba_password
+```
 
 2 — Add the Skill to Your Agent
 Copy skill.md into your agent's skills directory and register it.
