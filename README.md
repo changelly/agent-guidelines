@@ -1,154 +1,93 @@
----
+# Product API — AI Agent Integration Guide
 
-# 📄 `readme.md`
-
-```markdown
-# JSON-RPC over HTTP — RSA Signed API Integration
-
-> **Version:** 2.0.0  
-> **Last Updated:** 2026-04-24  
-> **Skill File:** `skill.md`  
-> **Compatible Agents:** OpenClaw and any OpenAI-function-compatible agent framework
+> **Skill File:** `skill.md`
 
 ---
 
-## Overview
+## What is This?
 
-This integration exposes a **JSON-RPC 2.0 API over HTTP** protected by a
-**three-layer authentication** mechanism:
+This guide explains how to integrate the changelly api into an AI agent framework
+such as [OpenClaw](https://github.com/openclaw) so that the agent can autonomously
+execute crypto trading operations on behalf of users.
 
-| Layer | Header | Method |
-|---|---|---|
-| Identity | `Authorization` | HTTP Basic Auth (Base64) |
-| Access Control | `x-api-key` | Static API Key |
-| Integrity | `x-api-signature` | RSA SHA256 over raw JSON body |
-
-All API methods share a **single HTTP endpoint**. The method name and its
-parameters are encoded inside the JSON-RPC request body — not in the URL path.
+The Product API uses **JSON-RPC 2.0 over HTTP** and requires every request to be
+cryptographically signed. The provided `skill.md` file encodes all the knowledge
+the agent needs to authenticate, call, and handle responses from the API correctly.
 
 ---
 
-## How Authentication Works
+## How It Works
 
-### Basic Auth
-$$\text{Authorization} = \texttt{"Basic "} + \text{Base64}(\text{user} + \texttt{":"} + \text{pass})$$
+The agent receives a natural language instruction from a user
+(e.g. *"swap 0.5 BTC to USDC"*), translates it into a signed JSON-RPC call,
+sends it to the Product API, and returns the result back to the user in plain language.
+User
+│
+│ "swap 0.5 BTC to USDC to address 0x123..."
+▼
+AI Agent (e.g. OpenClaw)
+│
+├─ Loads skill.md
+├─ Builds JSON-RPC envelope
+├─ Signs request body with RSA private key
+├─ Attaches x-api-key + Authorization headers
+│
+▼
+Product API (JSON-RPC 2.0 over HTTP)
+│
+├─ Verifies all 3 auth layers
+├─ Executes the requested method
+│
+▼
+AI Agent
+│
+├─ Parses json.result or json.error
+├─ Handles limit errors, retries, corrections
+│
+▼
+User
+│
+"Transaction created. ID: 1xknl..., status: pending"
 
-### RSA Signature
-$$\text{x-api-signature} = \text{Base64}\!\left(\text{RSA\_SHA256}_{k_{\text{private}}}\!\left(\texttt{JSON.stringify}(\text{rpcEnvelope})\right)\right)$$
 
-The signature is computed over the **compact JSON string** of the full request envelope.
-Any change to the body — including whitespace — will produce a different signature
-and cause the server to reject the request.
-
-### API Key
-A static opaque token passed verbatim as `x-api-key`.
 
 ---
 
-## Request & Response Reference
+## Prerequisites
 
-### Request Envelope
+Before running an agent against the Product API you will need:
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "method": "createTransaction",
-  "params": {
-    "from": "btc",
-    "to": "usdc",
-    "address": "0x28c6c06298d514db089934071355e5743bf21d60",
-    "amountFrom": "1"
-  }
-}
-Field	Type	Description
-jsonrpc	string	Always "2.0"
-id	string	Unique request ID; echoed in response for correlation
-method	string	The remote method to invoke
-params	object	Method-specific input parameters
-Success Response
+| Requirement | Description |
+|---|---|
+| **API Key** | Static key issued by Product, sent as `x-api-key` |
+| **RSA Private Key** | PKCS#8 hex-encoded key for request signing |
+| **Basic Auth Credentials** | Username and password issued by Product |
+| **Agent Framework** | OpenClaw or any OpenAI-function-compatible framework |
 
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "result": {
-    "transactionId": "abc123",
-    "status": "pending"
-  }
-}
-Error Response
+---
 
-{
-  "jsonrpc": "2.0",
-  "id": "1",
-  "error": {
-    "code": -32602,
-    "message": "Invalid amount for pair btc->usdc. Maximum amount is 0.64342124 btc",
-    "data": {
-      "limits": {
-        "max": { "from": "0.64342124", "to": "50012.474408" },
-        "min": { "from": "0.00023742", "to": "18.454024" }
-      }
-    }
-  }
-}
-⚠️ Error responses arrive with HTTP 200 OK.
-Always check for json.error in the body — never trust HTTP status alone.
+## Quick Start
 
-JSON-RPC Error Code Reference
-Code	Name	Meaning
--32700	Parse Error	Body is not valid JSON
--32600	Invalid Request	Envelope is missing required fields
--32601	Method Not Found	The method value is not recognised
--32602	Invalid Params	Wrong type, value, or out-of-range parameter
--32603	Internal Error	Server-side execution failure
--32000 to -32099	Application Error	Custom server-defined error
-Request Flow
+### 1 — Setup
 
-Agent
-  │
-  ├─ [1] Assemble JSON-RPC envelope → compact JSON string
-  │
-  ├─ [2] Load PKCS#8 RSA private key (hex)
-  │
-  ├─ [3] Sign compact body → SHA256withRSA → hex → Base64
-  │            └──► x-api-signature
-  │
-  ├─ [4] Encode user:pass → Base64
-  │            └──► Authorization: Basic ...
-  │
-  ├─ [5] Attach static key
-  │            └──► x-api-key
-  │
-  └─ [6] HTTP POST ──────────────────────────────► API Server
-                                                      │
-                                                      ├─ Verify x-api-key
-                                                      ├─ Verify Authorization
-                                                      ├─ Verify x-api-signature
-                                                      └─ Execute method
-         Agent ◄──────────────────────────────────────┘
-           │
-           ├─ HTTP 200 always
-           ├─ Check json.result → success
-           └─ Check json.error  → failure
-Setup
-1 — Install Dependencies
+1 — Configure Credentials
+Store all secrets as environment variables. Never hardcode them.
 
-npm install jsrsasign node-fetch
-2 — Set Environment Variables
+PRODUCT_ENDPOINT_URL=https://api.changelly.com/v2/
+PRODUCT_PRIVATE_KEY_HEX=308204bc020100300d06092a864886...
+PRODUCT_API_KEY=EKikACbkQiYNConmbByoWqQW1=
+PRODUCT_BASIC_AUTH_USER=ba_username
+PRODUCT_BASIC_AUTH_PASS=ba_password
 
-ENDPOINT_URL=https://api.example.com/rpc
-PRIVATE_KEY_HEX=308204bc020100300d06092a864886...
-API_KEY=EKikACbkQiYNConmbByoWqQW1qOh2DVdMRDBedXFRPw=
-BASIC_AUTH_USER=exodus
-BASIC_AUTH_PASS=JAk24Y4bUy35yA7r
-3 — Register Skill in OpenClaw
-Place skill.md in the skills directory and register it:
+2 — Add the Skill to Your Agent
+Copy skill.md into your agent's skills directory and register it.
+
+OpenClaw example:
 
 
-/agent
+/my-agent
   /skills
-    skill.md
+    skill.md        ← drop it here
   agent.config.json
 
 {
@@ -156,63 +95,45 @@ Place skill.md in the skills directory and register it:
     "skills/skill.md"
   ]
 }
-Full Working Example
+Your agent now knows how to authenticate, sign, call, and handle responses
+from the Product API without any additional code.
 
-const { KJUR, RSAKey, hextob64 } = require('jsrsasign');
+3 — Run Your Agent
 
-async function callJsonRpc({ method, params, requestId = crypto.randomUUID() }) {
-  const endpointUrl   = process.env.ENDPOINT_URL;
-  const privateKeyHex = process.env.PRIVATE_KEY_HEX;
-  const apiKey        = process.env.API_KEY;
-  const authUser      = process.env.BASIC_AUTH_USER;
-  const authPass      = process.env.BASIC_AUTH_PASS;
+openclaw run --config agent.config.json
+The agent is now ready to accept user instructions and execute crypto trading
+operations through the Product API.
 
-  // Build compact envelope
-  const body = JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params });
+What the Agent Can Do
+Once the skill is loaded, the agent is capable of handling the following
+Example of request:
 
-  // Sign
-  const key = new RSAKey();
-  key.readPKCS8PrvKeyHex(privateKeyHex);
-  const sig = new KJUR.crypto.Signature({ alg: 'SHA256withRSA' });
-  sig.init(key);
-  const signature = hextob64(sig.signString(body));
+Crypto Trading
 
-  // Basic Auth
-  const basicAuth = 'Basic ' + Buffer.from(`${authUser}:${authPass}`).toString('base64');
+User Instruction                              Agent Action
+"Swap 0.5 BTC to USDC"	                      Calls createTransaction with the given pair and amount
+"Exchange ETH to BTC, send to address 0x123"	Builds and signs a createTransaction call
 
-  // Send
-  const response = await fetch(endpointUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type'    : 'application/json',
-      'x-api-key'       : apiKey,
-      'x-api-signature' : signature,
-      'Authorization'   : basicAuth,
-    },
-    body,
-  });
+User:   Swap 1 BTC to USDC, send to 0x28c6c06298d514db08993407bf21d60
 
-  const json = await response.json();
+Agent:  I tried to create the transaction but the amount of 1 BTC exceeds
+        the current maximum of 0.64342124 BTC for this pair.
+        The valid range is 0.00023742 BTC – 0.64342124 BTC.
+        Would you like me to proceed with 0.64 BTC instead?
 
-  if (json.error) {
-    console.error(`[${json.error.code}] ${json.error.message}`);
-    if (json.error.data?.limits) {
-      const { min, max } = json.error.data.limits;
-      console.error(`Valid range: ${min.from} – ${max.from}`);
-    }
-    return { success: false, error: json.error };
-  }
+User:   Yes, go ahead.
 
-  return { success: true, result: json.result };
-}
+Agent:  Done. Transaction created successfully.
+        ID: 3c6a5467784e4088ac41abe1c68abc29b9ae695b074a734f13aa2d5016bb26d8 | Status: pending
 
-// Example call
-callJsonRpc({
-  method: 'createTransaction',
-  params: {
-    from       : 'btc',
-    to         : 'usdc',
-    address    : '0x28c6c06298d514db089934071355e5743bf21d60',
-    amountFrom : '0.5',
-  },
-}).then(console.log);
+The Skill File
+skill.md is the single file that gives the agent everything it needs to work
+with the Product API. It is written in the OpenClaw skill format and contains:
+
+Section	What It Provides
+Inputs / Outputs	Typed parameter definitions the agent maps user intent onto
+Steps	Ordered, unambiguous instructions for building and sending each request
+Implementation	A ready-to-run JavaScript reference the agent can execute
+Example Invocation	A concrete JSON example the agent can pattern-match against
+You do not need to write any custom tool code. Loading skill.md is sufficient
+for a compatible agent to start using the Product API.
