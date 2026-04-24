@@ -84,7 +84,7 @@ Copy skill.md into your agent's skills directory and register it.
 
 OpenClaw example:
 
-
+```bash
 /my-agent
   /skills
     skill.md        ← drop it here
@@ -95,6 +95,8 @@ OpenClaw example:
     "skills/skill.md"
   ]
 }
+```
+
 Your agent now knows how to authenticate, sign, call, and handle responses
 from the Product API without any additional code.
 
