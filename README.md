@@ -21,6 +21,7 @@ the agent needs to authenticate, call, and handle responses from the API correct
 The agent receives a natural language instruction from a user
 (e.g. *"swap 0.5 BTC to USDC"*), translates it into a signed JSON-RPC call,
 sends it to the Product API, and returns the result back to the user in plain language.
+```
 User
 │
 │ "swap 0.5 BTC to USDC to address 0x123..."
@@ -49,7 +50,7 @@ User
 │
 "Transaction created. ID: 1xknl..., status: pending"
 
-
+```
 
 ---
 
