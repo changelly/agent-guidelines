@@ -115,9 +115,7 @@ Example of request:
 
 Crypto Trading
 
-User Instruction                              Agent Action
-"Swap 0.5 BTC to USDC"	                      Calls createTransaction with the given pair and amount
-"Exchange ETH to BTC, send to address 0x123"	Builds and signs a createTransaction call
+"Exchange ETH to BTC, send to address 0x28c6c06298d514db08993407bf21d60"  => 	Builds and signs a createTransaction call
 
 ```
 User:   Swap 1 BTC to USDC, send to 0x28c6c06298d514db08993407bf21d60
