@@ -42,7 +42,6 @@ all method calls, differentiated by the `method` field in the body.
 |---|---|
 | `jsrsasign` | RSA key parsing and SHA256withRSA signing |
 | `node-fetch` or `axios` | HTTP request execution |
-| `Buffer` / `btoa` | Base64 encoding for Basic Auth |
 | PKCS#8 RSA Private Key (hex) | Signing identity |
 
 ---
@@ -181,7 +180,7 @@ const signature = crypto.sign('sha256', Buffer.from(body), privateKey);
 ```
 ⚠️ Critical security guidelines for agents handling this skill:
 
-Never log privateKeyHex or basicAuthPass in plain text
+Never log privateKeyHex in plain text
 Never hardcode secrets — read from environment variables
 The signature is bound to the exact raw body string — never reuse across requests
 
