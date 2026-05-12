@@ -10,9 +10,7 @@
 ## Description
 This skill enables agents to communicate with a **JSON-RPC 2.0 over HTTP** API that requires:
 1. **RSA SHA256 digital signature** over the raw JSON-RPC request body
-2. **API Key** header (`x-api-key`)
-3. **Basic Auth** header (`Authorization`)
-4. **Dynamic signature** header (`x-api-signature`)
+2. **Dynamic signature** header (`x-api-signature`)
 
 All requests follow the **JSON-RPC 2.0 specification** — a single HTTP endpoint receives
 all method calls, differentiated by the `method` field in the body.
@@ -58,9 +56,6 @@ all method calls, differentiated by the `method` field in the body.
 | `params` | `object` | ✅ | Method parameters as a key-value object |
 | `request_id` | `string` | ✅ | Unique request identifier (e.g. `"1"`, UUID) |
 | `private_key_hex` | `string` | ✅ | PKCS#8 RSA private key in HEX format |
-| `api_key` | `string` | ✅ | Static API key value |
-| `basic_auth_user` | `string` | ✅ | Username for Basic Auth |
-| `basic_auth_pass` | `string` | ✅ | Password for Basic Auth |
 
 ---
 
@@ -92,155 +87,97 @@ all method calls, differentiated by the `method` field in the body.
 ⚠️ Do not pretty-print — use compact serialization to ensure signature consistency
 
 ### Step 2 — Load RSA Private Key
-Parse the PKCS#8 hex private key using RSAKey from jsrsasign
-Call key.readPKCS8PrvKeyHex(privateKeyHex)
-Step 3 — Sign the Raw JSON Body
-Create a KJUR.crypto.Signature instance with algorithm "SHA256withRSA"
-Initialize with the loaded RSA key
-Call sig.signString(rawBody) on the compact JSON string
-Convert hex result to Base64 via hextob64()
+Parse the PKCS#8 hex private key and PKCS#1 public key using crypto libraries
+```
+crypto.createPrivateKey({
+  key: Buffer.from(privateKeyString, 'hex'),
+  format: 'der',
+  type: 'pkcs8',
+});
+
+crypto.createPublicKey(privateKey).export({
+  type: 'pkcs1',
+  format: 'der',
+});
+```
+
+### Step 3 — Sign the Raw JSON Body
+```
+const message = {
+  jsonrpc: '2.0',
+  id: 'test',
+  method: 'getCurrencies',
+};
+
+const body = JSON.stringify(message);
+
+const signature = crypto.sign('sha256', Buffer.from(body), privateKey).toString('base64');
+```
 This becomes x-api-signature
 
-
-### Step 4 — Build Basic Auth Header
-Concatenate "username:password"
-Encode as Base64 using Buffer.from(...).toString('base64')
-Prepend "Basic " → Authorization header
-
-### Step 5 — Assemble Headers
+### Step 4 — Assemble Headers
 ```
 {
-  "Content-Type": "application/json",
-  "x-api-key": "<api_key>",
-  "x-api-signature": "<base64-rsa-signature>",
-  "Authorization": "Basic <base64-credentials>"
+    'Content-Type': 'application/json',
+    'X-Api-Key': crypto.createHash('sha256').update(publicKey).digest('base64'),
+    'X-Api-Signature': signature,
 }
 ```
-### Step 6 — Send HTTP POST Request
+### Step 5 — Send HTTP POST Request
 Method: POST (always, per JSON-RPC over HTTP spec)
 URL: endpoint_url
 Headers: assembled above
 Body: the raw JSON string from Step 1
-Step 7 — Parse and Validate JSON-RPC Response
+
+### Step 6 — Parse and Validate JSON-RPC Response
 Parse response body as JSON
 Check for presence of error field:
 If error → extract code, message, data and return as structured error
 If result → return as success payload
 
-### Step 8 — Return Structured Output
+### Step 7 — Return Structured Output
 
-Pseudocode
-```bash
-FUNCTION call_jsonrpc(endpoint, method, params, requestId, privateKeyHex, apiKey, authUser, authPass):
-
-  // Step 1: Build JSON-RPC body
-  body = JSON.stringify({
-    jsonrpc : "2.0",
-    id      : requestId,
-    method  : method,
-    params  : params
-  })
-
-  // Step 2: Load RSA Key
-  key = new RSAKey()
-  key.readPKCS8PrvKeyHex(privateKeyHex)
-
-  // Step 3: Sign body
-  sig = new KJUR.crypto.Signature({ alg: "SHA256withRSA" })
-  sig.init(key)
-  signature = hextob64(sig.signString(body))
-
-  // Step 4: Basic Auth
-  basicAuth = "Basic " + base64(authUser + ":" + authPass)
-
-  // Step 5: Headers
-  headers = {
-    "Content-Type"    : "application/json",
-    "x-api-key"       : apiKey,
-    "x-api-signature" : signature,
-    "Authorization"   : basicAuth
-  }
-
-  // Step 6: HTTP POST
-  response = HTTP_POST(endpoint, headers, body)
-
-  // Step 7: Parse response
-  json = JSON.parse(response.body)
-
-  return parsed response
-```
 JavaScript Implementation Reference
 ```
-const { KJUR, RSAKey, hextob64 } = require('jsrsasign');
+const crypto = require('crypto');
 
-/**
- * Call a JSON-RPC 2.0 method over HTTP with RSA signature auth.
- *
- * @param {object} options
- * @param {string} options.endpointUrl      - API base URL
- * @param {string} options.method           - JSON-RPC method name
- * @param {object} options.params           - Method parameters
- * @param {string} options.requestId        - Unique request ID
- * @param {string} options.privateKeyHex    - PKCS#8 RSA private key hex
- * @param {string} options.apiKey           - Static API key
- * @param {string} options.basicAuthUser    - Basic auth username
- * @param {string} options.basicAuthPass    - Basic auth password
- * @returns {Promise<object>}               - Structured response
- */
-async function callJsonRpc({
-  endpointUrl,
-  method,
-  params,
-  requestId,
-  privateKeyHex,
-  apiKey,
-  basicAuthUser,
-  basicAuthPass,
-}) {
-  // Step 1: Build JSON-RPC envelope (compact, no pretty-print)
-  const body = JSON.stringify({
-    jsonrpc: '2.0',
-    id: requestId,
-    method,
-    params,
-  });
+const privateKeyString = 'YOUR_PRIVATE_KEY';
 
-  // Step 2: Load RSA Private Key
-  const key = new RSAKey();
-  key.readPKCS8PrvKeyHex(privateKeyHex);
+const privateKey = crypto.createPrivateKey({
+  key: Buffer.from(privateKeyString, 'hex'),
+  format: 'der',
+  type: 'pkcs8',
+});
 
-  // Step 3: Sign the raw body string
-  const sig = new KJUR.crypto.Signature({ alg: 'SHA256withRSA' });
-  sig.init(key);
-  const signature = hextob64(sig.signString(body));
+const publicKey = crypto.createPublicKey(privateKey).export({
+  type: 'pkcs1',
+  format: 'der',
+});
 
-  // Step 4: Build Basic Auth header
-  const basicAuth = 'Basic ' + Buffer.from(`${basicAuthUser}:${basicAuthPass}`).toString('base64');
+const message = {
+  jsonrpc: '2.0',
+  id: 'test',
+  method: 'getCurrencies',
+};
 
-  // Step 5: Assemble headers
-  const headers = {
-    'Content-Type'    : 'application/json',
-    'x-api-key'       : apiKey,
-    'x-api-signature' : signature,
-    'Authorization'   : basicAuth,
-  };
+const body = JSON.stringify(message);
 
-  // Step 6: Send HTTP POST
-  const response = await fetch(endpointUrl, {
+const signature = crypto.sign('sha256', Buffer.from(body), privateKey);
+
+(async () => {
+  const res = await fetch('https://api.changelly.com/v2', {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Api-Key': crypto.createHash('sha256').update(publicKey).digest('base64'),
+      'X-Api-Signature': signature.toString('base64'),
+    },
     body,
   });
 
-  // Step 7: Parse JSON-RPC response
-  const json = await response.json();
+  console.log(await res.text());
+})();
 
-  if (String(json.id) !== String(requestId)) {
-    throw new Error(`Response ID mismatch: expected ${requestId}, got ${json.id}`);
-  }
-
-  return json;
-}
 ```
 ⚠️ Critical security guidelines for agents handling this skill:
 
@@ -263,10 +200,7 @@ Example Agent Invocation
       "amountFrom": "0.5"
     },
     "request_id": "1",
-    "private_key_hex": "308204bc020100300d06092a86...",
-    "api_key": "EKikAC...",
-    "basic_auth_user": "user",
-    "basic_auth_pass": "auth_pass"
+    "private_key_hex": "308204bc020100300d06092a86..."
   }
 }
 ```
