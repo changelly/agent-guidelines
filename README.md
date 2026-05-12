@@ -60,9 +60,7 @@ Before running an agent against the Product API you will need:
 
 | Requirement | Description |
 |---|---|
-| **API Key** | Static key issued by Product, sent as `x-api-key` |
 | **RSA Private Key** | PKCS#8 hex-encoded key for request signing |
-| **Basic Auth Credentials** | Username and password issued by Product |
 | **Agent Framework** | OpenClaw or any OpenAI-function-compatible framework |
 
 ---
@@ -72,14 +70,11 @@ Before running an agent against the Product API you will need:
 ### 1 — Setup
 
 1 — Configure Credentials
-Store all secrets as environment variables. Never hardcode them.
+Store all secrets as environment variables.
 
 ```bash
 PRODUCT_ENDPOINT_URL=https://api.changelly.com/v2/
 PRODUCT_PRIVATE_KEY_HEX=308204bc020100300d06092a864886...
-PRODUCT_API_KEY=EKikACbkQiYNConmbByoWqQW1=
-PRODUCT_BASIC_AUTH_USER=ba_username
-PRODUCT_BASIC_AUTH_PASS=ba_password
 ```
 
 2 — Add the Skill to Your Agent
